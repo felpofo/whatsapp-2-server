@@ -18,8 +18,9 @@ export interface ClientToServerEvents {
 
 export interface ServerToClientEvents {
   message: (message: Message) => void;
-  previousMessages: (messages: Record<string, Message>) => void;
+  previousMessages: (messages: Message[]) => void;
   deleteMessage: (id: string) => void;
+  onlineUsers: (users: User[]) => void;
 }
 
 export interface InterServerEvents {

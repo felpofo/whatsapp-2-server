@@ -4,9 +4,9 @@ import cors from "cors";
 import { v4 as uuid } from "uuid";
 import { Server } from "socket.io";
 
-import { ServerToClientEvents, ClientToServerEvents, InterServerEvents, SocketData, Message } from "./types";
+import { ServerToClientEvents, ClientToServerEvents, InterServerEvents, SocketData, Message, User } from "./types";
 
-const PORT = process.env.PORT ?? 3000;
+const PORT = process.env.PORT ?? 3001;
 const app = express();
 app.set("port", PORT);
 app.use(cors());
@@ -15,8 +15,8 @@ app.get("/", (_, res) => res.send("OK"));
 
 const server = http.createServer(app);
 
-const messages: Set<Message> = new Set();
-// const users = {};
+let messages: Message[] = [];
+let users: User[] = [];
 
 const io = new Server<
   ClientToServerEvents,
@@ -30,19 +30,28 @@ const io = new Server<
   }
 });
 
+function sortUsers() {
+  users = users.sort((user1: User, user2: User) => {
+    const a = user1.name.toUpperCase();
+    const b = user2.name.toUpperCase();
+
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
+}
+
 io.on("connection", (socket) => {
-  socket.emit("previousMessages", (() => {
-    const parsedMessages: Record<string, Message> = {};
-
-    messages.forEach(message => {
-      parsedMessages[message.id] = message;
-    });
-
-    return parsedMessages;
-  })());
+  socket.emit("onlineUsers", users);
+  socket.emit("previousMessages", messages);
 
   socket.on("setName", name => {
     socket.data.name = name;
+
+    users.push({ id: socket.id, name });
+    sortUsers();
+
+    io.emit("onlineUsers", users);
   });
 
   socket.on("message", text => {
@@ -56,18 +65,19 @@ io.on("connection", (socket) => {
       value: text
     };
 
-    messages.add(message);
+    messages.push(message);
     io.emit("message", message);
   });
 
   socket.on("deleteMessage", id => {
-    messages.forEach(message => {
-      if (message.id == id)
-        messages.delete(message);
-    });
-
+    messages = messages.filter(message => message.id !== id && message);
+    
     io.emit("deleteMessage", id);
+  });
+
+  socket.on("disconnect", () => {
+    users = users.filter(user => user.id !== socket.id && user);
   });
 });
 
-server.listen(PORT);
+server.listen(PORT, () => console.log("online on port " + PORT));
