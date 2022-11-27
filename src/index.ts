@@ -5,6 +5,8 @@ import fs from "fs";
 import { v4 as uuid } from "uuid";
 import { Server } from "socket.io";
 import { Message, User, MyServer } from "./types";
+import { sortUsers } from "./utils";
+import { routes } from "./routes";
 
 let messages: Message[] = [];
 let users: User[] = [];
@@ -15,34 +17,20 @@ const PORT = process.env.PORT ?? 3001;
 const app = express();
 
 app.use(cors());
-
-app.get("/", (_, res) => res.send("OK"));
+app.use(routes);
 
 const server = http.createServer(app);
 const io: MyServer = new Server(server, { cors: { origin: "*" } });
-
-function sortUsers() {
-  users = users.sort((user1: User, user2: User) => {
-    const a = user1.name.toUpperCase();
-    const b = user2.name.toUpperCase();
-
-    if (a < b) return -1;
-    if (a > b) return 1;
-    return 0;
-  });
-}
 
 io.on("connection", (socket) => {
   socket.emit("onlineUsers", users);
   socket.emit("allMessages", messages);
 
   socket.on("setName", (name, previousId) => {
-    if (socket.data.name) return;
-
     socket.data.name = name;
 
     users.push({ id: socket.id, name });
-    sortUsers();
+    users = sortUsers(users);
 
     io.emit("onlineUsers", users);
 
@@ -87,13 +75,10 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log("running on port " + PORT);
-});
+server.listen(PORT, () => console.log("running on port " + PORT));
 
-process.on("exit", (code) => {
+process.on("exit", () => {
   fs.writeFileSync("messages.json", JSON.stringify(messages, null, 2));
-  process.exit(code);
 });
 
 process.on("SIGINT", () => {
