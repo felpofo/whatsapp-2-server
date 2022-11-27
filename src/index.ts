@@ -1,34 +1,25 @@
 import express from "express";
 import http from "http";
 import cors from "cors";
+import fs from "fs";
 import { v4 as uuid } from "uuid";
 import { Server } from "socket.io";
+import { Message, User, MyServer } from "./types";
 
-import { ServerToClientEvents, ClientToServerEvents, InterServerEvents, SocketData, Message, User } from "./types";
+let messages: Message[] = [];
+let users: User[] = [];
+
+messages = JSON.parse(fs.readFileSync("messages.json").toString());
 
 const PORT = process.env.PORT ?? 3001;
 const app = express();
-app.set("port", PORT);
+
 app.use(cors());
 
 app.get("/", (_, res) => res.send("OK"));
 
 const server = http.createServer(app);
-
-let messages: Message[] = [];
-let users: User[] = [];
-
-const io = new Server<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData
->(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
+const io: MyServer = new Server(server, { cors: { origin: "*" } });
 
 function sortUsers() {
   users = users.sort((user1: User, user2: User) => {
@@ -96,4 +87,15 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => console.log("online on port " + PORT));
+server.listen(PORT, () => {
+  console.log("running on port " + PORT);
+});
+
+process.on("exit", (code) => {
+  fs.writeFileSync("messages.json", JSON.stringify(messages, null, 2));
+  process.exit(code);
+});
+
+process.on("SIGINT", () => {
+  process.exit();
+});
