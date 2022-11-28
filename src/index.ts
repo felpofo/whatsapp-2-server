@@ -1,7 +1,6 @@
 import express from "express";
 import http from "http";
 import cors from "cors";
-import fs from "fs";
 import { v4 as uuid } from "uuid";
 import { Server } from "socket.io";
 import { Message, User, MyServer } from "./types";
@@ -10,8 +9,6 @@ import { routes } from "./routes";
 
 let messages: Message[] = [];
 let users: User[] = [];
-
-messages = JSON.parse(fs.readFileSync("messages.json").toString());
 
 const PORT = process.env.PORT ?? 3001;
 const app = express();
@@ -72,15 +69,8 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     users = users.filter(user => user.id !== socket.id && user);
+    io.emit("onlineUsers", users);
   });
 });
 
 server.listen(PORT, () => console.log("running on port " + PORT));
-
-process.on("exit", () => {
-  fs.writeFileSync("messages.json", JSON.stringify(messages, null, 2));
-});
-
-process.on("SIGINT", () => {
-  process.exit();
-});
